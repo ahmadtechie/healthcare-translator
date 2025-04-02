@@ -1,38 +1,42 @@
-import io
+import logging
 
-from google.cloud import speech
-from rest_framework import generics
-from rest_framework.parsers import MultiPartParser
+from apps.generative_ai.serializers import TextTranslationSerializer
+from django.conf import settings
+from google.cloud import translate_v3
+from rest_framework import generics, serializers
 from rest_framework.response import Response
 
-from backend.apps.generative_ai.serializers import TextToImageSerializer
+logger = logging.getLogger(__name__)
 
 
-class SpeechToTextView(generics.GenericAPIView):
+class TextTranslationtView(generics.GenericAPIView):
     permission_classes = []
     authentication_classes = []
-    parser_classes = (MultiPartParser,)
-    serializer_class = TextToImageSerializer
+    serializer_class = TextTranslationSerializer
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        audio_file = serializer.validated_data["audio"]
-        audio_content = audio_file.read()
+        source_text = serializer.validated_data["source_text"]
+        source_language_code = serializer.validated_data["source_language_code"]
+        target_language_code = serializer.validated_data["target_language_code"]
+        PROJECT_ID = settings.GOOGLE_CLOUD_PROJECT
 
-        client = speech.SpeechClient()
-        audio = speech.RecognitionAudio(content=audio_content)
-        config = speech.RecognitionConfig(
-            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-            sample_rate_hertz=16000,
-            language_code="en-US",
-        )
+        client = translate_v3.TranslationServiceClient()
+        parent = f"projects/{PROJECT_ID}/locations/global"
+        mime_type = "text/plain"
 
-        response = client.recognize(config=config, audio=audio)
+        try:
+            response = client.translate_text(
+                contents=[source_text],
+                parent=parent,
+                mime_type=mime_type,
+                source_language_code=source_language_code,
+                target_language_code=target_language_code,
+            )
+        except Exception as e:
+            logger.error(str(e))
+            raise serializers.ValidationError("Error translating text.")
 
-        # Process the response and extract the transcript
-        transcripts = []
-        for result in response.results:
-            transcripts.append(result.alternatives[0].transcript)
-
-        return Response({"transcripts": transcripts})
+        translated_text = response.translations[0].translated_text
+        return Response({"translated_text": translated_text})

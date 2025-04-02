@@ -12,8 +12,20 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 
+import environ
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+env = environ.Env()
+
+# Take environment variables from .env file
+environ.Env.read_env(BASE_DIR / ".env")
+
+# Cors
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS", cast=list)
 
 
 # Quick-start development settings - unsuitable for production
@@ -41,11 +53,13 @@ INSTALLED_APPS = [
     "apps.generative_ai",
     # 3rd party apps
     "rest_framework",
+    "corsheaders",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -125,3 +139,5 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+GOOGLE_CLOUD_PROJECT = env("GOOGLE_CLOUD_PROJECT")

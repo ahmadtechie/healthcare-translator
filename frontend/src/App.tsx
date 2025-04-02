@@ -8,7 +8,7 @@ import axios from 'axios';
 function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [sourceLanguage, setSourceLanguage] = useState<Language>({ value: 'en', label: 'English' });
-  const [targetLanguage, setTargetLanguage] = useState<Language>({ value: 'es', label: 'Spanish' });
+  const [targetLanguage, setTargetLanguage] = useState<Language>({ value: 'ar', label: 'Arabic' });
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [recognition, setRecognition] = useState<any>(null);
   const [error, setError] = useState<string>('');
@@ -16,19 +16,17 @@ function App() {
   const translateText = async (text: string) => {
     try {
       console.log('Translating text:', text);
-      const response = await axios.post('https://libretranslate.com/translate', {
-        q: text,
-        source: sourceLanguage.value,
-        target: targetLanguage.value,
-        format: "text",
-        alternatives: 3
+      const response = await axios.post('http://localhost:8007/ai/translate/', {
+        source_text: text,
+        source_language_code: sourceLanguage.value,
+        target_language_code: targetLanguage.value,
       }, {
         headers: {
           'Content-Type': 'application/json'
         }
       });
       console.log('Translation response:', response.data);
-      return response.data.translatedText;
+      return response.data.translated_text;
     } catch (error: any) {
       console.error('Translation error:', error.response?.data || error.message);
       setError(`Translation failed: ${error.response?.data?.error || 'Please try again'}`);
