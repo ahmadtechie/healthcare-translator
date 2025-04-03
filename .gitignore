@@ -16,6 +16,7 @@ staticfiles/
 !logs/x.txt
 .idea/
 myenv/
+temp/
 dump.rdb
 
 # If your build process includes running collectstatic, then you probably don't need or want to include staticfiles/

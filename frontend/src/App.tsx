@@ -163,11 +163,11 @@ function App() {
           >
             {isRecording ? (
               <>
-                <MicOff size={20} /> Stop Recording
+                <MicOff size={10} /> Stop Recording
               </>
             ) : (
               <>
-                <Mic size={20} /> Start Recording
+                <Mic size={10} /> Start Recording
               </>
             )}
           </button>
