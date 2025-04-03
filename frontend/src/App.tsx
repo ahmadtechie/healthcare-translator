@@ -4,7 +4,7 @@ import { LanguageSelector } from './components/LanguageSelector';
 import { TranscriptDisplay } from './components/TranscriptDisplay';
 import { Language, TranscriptSegment } from './types';
 
-const BASE_URL = 'http://localhost:8007';
+const BASE_URL = import.meta.env.VITE_APP_BASE_URL;
 
 // Constants for voice activity detection
 const SILENCE_THRESHOLD = -50; // dB
@@ -61,11 +61,9 @@ function App() {
         body: formData,
       });
 
-      console.log(transcriptionResponse)
 
       if (!transcriptionResponse.ok) {
         const errorData = await transcriptionResponse.json(); // Try to parse JSON error
-        console.error("Transcription Error:", errorData);
         throw new Error(errorData.detail || "Transcription failed");
       }
 
@@ -100,7 +98,6 @@ function App() {
         targetLanguageCode: targetLanguage.value
       }]);
     } catch (error: any) {
-      console.error('Processing error: ', error);
       setError(`Processing failed: ${error.message}`);
     }
   };
@@ -146,7 +143,6 @@ function App() {
       setError('');
       checkAudio();
     } catch (error: any) {
-      console.error('Recording error:', error);
       setError(`Failed to start recording: ${error.message}`);
       setIsRecording(false);
     }
