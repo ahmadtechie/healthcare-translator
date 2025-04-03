@@ -3,116 +3,183 @@ import { Mic, MicOff } from 'lucide-react';
 import { LanguageSelector } from './components/LanguageSelector';
 import { TranscriptDisplay } from './components/TranscriptDisplay';
 import { Language, TranscriptSegment } from './types';
-import axios from 'axios';
+
+const BASE_URL = 'http://localhost:8007';
+
+// Constants for voice activity detection
+const SILENCE_THRESHOLD = -50; // dB
+const SILENCE_DURATION = 2000; // ms
 
 function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [sourceLanguage, setSourceLanguage] = useState<Language>({ value: 'en', label: 'English' });
   const [targetLanguage, setTargetLanguage] = useState<Language>({ value: 'ar', label: 'Arabic' });
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
-  const [recognition, setRecognition] = useState<any>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [error, setError] = useState<string>('');
+  const [lastVoiceActivity, setLastVoiceActivity] = useState<number>(Date.now());
+  const [audioContext] = useState<AudioContext>(() => new (window.AudioContext || (window as any).webkitAudioContext)());
+  const [silenceTimer, setSilenceTimer] = useState<number | null>(null);
 
-  const translateText = async (text: string) => {
+  const detectSilence = useCallback((audioData: Float32Array) => {
+    // Calculate RMS value
+    const rms = Math.sqrt(audioData.reduce((sum, val) => sum + val * val, 0) / audioData.length);
+    
+    // Convert to dB
+    const db = 20 * Math.log10(rms);
+
+    if (db > SILENCE_THRESHOLD) {
+      setLastVoiceActivity(Date.now());
+      if (silenceTimer) {
+        window.clearTimeout(silenceTimer);
+        setSilenceTimer(null);
+      }
+    } else {
+      // If we haven't set a silence timer yet, set one
+      if (!silenceTimer) {
+        const timer = window.setTimeout(() => {
+          const timeSinceLastVoice = Date.now() - lastVoiceActivity;
+          if (timeSinceLastVoice >= SILENCE_DURATION) {
+            stopRecording();
+          }
+        }, SILENCE_DURATION);
+        setSilenceTimer(timer);
+      }
+    }
+  }, [lastVoiceActivity, silenceTimer]);
+
+  const processAudioChunk = async (audioBlob: Blob) => {
     try {
-      console.log('Translating text:', text);
-      const response = await axios.post('http://localhost:8007/ai/translate/', {
-        source_text: text,
-        source_language_code: sourceLanguage.value,
-        target_language_code: targetLanguage.value,
-      }, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
+      // Create FormData for the audio file
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'audio.webm');
+      formData.append("language_code", sourceLanguage.value)
+
+      // Step 1: Get transcription
+      const transcriptionResponse = await fetch(`${BASE_URL}/ai/transcribe/`, {
+        method: 'POST',
+        body: formData,
       });
-      console.log('Translation response:', response.data);
-      return response.data.translated_text;
+
+      console.log(transcriptionResponse)
+
+      if (!transcriptionResponse.ok) {
+        const errorData = await transcriptionResponse.json(); // Try to parse JSON error
+        console.error("Transcription Error:", errorData);
+        throw new Error(errorData.detail || "Transcription failed");
+      }
+
+
+      const transcriptionData = await transcriptionResponse.json();
+      const transcribedText = transcriptionData.Transcript;
+
+      // Step 2: Get translation
+      const translationResponse = await fetch(`${BASE_URL}/ai/translate/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          source_text: transcribedText,
+          source_language_code: sourceLanguage.value,
+          target_language_code: targetLanguage.value,
+        }),
+      });
+
+      if (!translationResponse.ok) {
+        throw new Error('Translation failed');
+      }
+
+      const translationData = await translationResponse.json();
+      
+      setSegments(prev => [...prev, {
+        text: transcribedText,
+        translation: translationData.translated_text,
+        timestamp: Date.now(),
+        sourceLanguageCode: sourceLanguage.value,
+        targetLanguageCode: targetLanguage.value
+      }]);
     } catch (error: any) {
-      console.error('Translation error:', error.response?.data || error.message);
-      setError(`Translation failed: ${error.response?.data?.error || 'Please try again'}`);
-      return text; // Return original text if translation fails
+      console.error('Processing error: ', error);
+      setError(`Processing failed: ${error.message}`);
     }
   };
 
-  const startRecording = useCallback(() => {
-    if ('webkitSpeechRecognition' in window) {
-      const recognition = new (window as any).webkitSpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = sourceLanguage.value;
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm',
+      });
 
-      recognition.onstart = () => {
-        console.log('Speech recognition started');
-        setError('');
-      };
+      // Set up audio analysis for voice activity detection
+      const audioSource = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+      audioSource.connect(analyser);
 
-      recognition.onresult = async (event: any) => {
-        console.log('Speech recognition result received');
-        const last = event.results.length - 1;
-        const text = event.results[last][0].transcript;
-        console.log('Recognized text:', text);
-        
-        if (event.results[last].isFinal) {
-          console.log('Final result received, translating...');
-          const translation = await translateText(text);
-          
-          setSegments(prev => [...prev, {
-            text,
-            translation,
-            timestamp: Date.now()
-          }]);
-        }
-      };
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Float32Array(bufferLength);
 
-      recognition.onend = () => {
-        console.log('Speech recognition ended');
+      const checkAudio = () => {
         if (isRecording) {
-          console.log('Restarting speech recognition');
-          recognition.start();
+          analyser.getFloatTimeDomainData(dataArray);
+          detectSilence(dataArray);
+          requestAnimationFrame(checkAudio);
         }
       };
 
-      recognition.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
-        setError(`Speech recognition error: ${event.error}`);
-        setIsRecording(false);
+      const audioChunks: Blob[] = [];
+
+      recorder.ondataavailable = async (event) => {
+        if (event.data.size > 0) {
+          audioChunks.push(event.data);
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          await processAudioChunk(audioBlob);
+          audioChunks.length = 0;
+        }
       };
 
-      try {
-        recognition.start();
-        setRecognition(recognition);
-        setIsRecording(true);
-        setError('');
-      } catch (error) {
-        console.error('Error starting speech recognition:', error);
-        setError('Failed to start speech recognition. Please try again.');
-        setIsRecording(false);
-      }
-    } else {
-      setError('Speech recognition is not supported in this browser.');
+      recorder.start(5000);
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+      setError('');
+      checkAudio();
+    } catch (error: any) {
+      console.error('Recording error:', error);
+      setError(`Failed to start recording: ${error.message}`);
+      setIsRecording(false);
     }
-  }, [sourceLanguage, isRecording]);
+  }, [sourceLanguage.value, targetLanguage.value, audioContext, detectSilence]);
 
   const stopRecording = useCallback(() => {
-    if (recognition) {
-      recognition.stop();
-      console.log('Speech recognition stopped');
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
     }
     setIsRecording(false);
-    setRecognition(null);
-  }, [recognition]);
+    setMediaRecorder(null);
+    if (silenceTimer) {
+      window.clearTimeout(silenceTimer);
+      setSilenceTimer(null);
+    }
+  }, [mediaRecorder, silenceTimer]);
 
   useEffect(() => {
     return () => {
-      if (recognition) {
-        recognition.stop();
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      }
+      if (silenceTimer) {
+        window.clearTimeout(silenceTimer);
       }
     };
-  }, [recognition]);
+  }, [mediaRecorder, silenceTimer]);
 
-  const handleSpeak = (text: string) => {
+  const handleSpeak = (text: string, languageCode: string) => {
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = targetLanguage.value;
+    utterance.lang = languageCode;
     window.speechSynthesis.speak(utterance);
   };
 
@@ -141,7 +208,12 @@ function App() {
           />
           <LanguageSelector
             value={targetLanguage}
-            onChange={setTargetLanguage}
+            onChange={(lang) => {
+              setTargetLanguage(lang);
+              if (isRecording) {
+                stopRecording();
+              }
+            }}
             label="Target Language"
           />
         </div>
@@ -163,11 +235,11 @@ function App() {
           >
             {isRecording ? (
               <>
-                <MicOff size={10} /> Stop Recording
+                <MicOff size={20} /> Stop Recording
               </>
             ) : (
               <>
-                <Mic size={10} /> Start Recording
+                <Mic size={20} /> Start Recording
               </>
             )}
           </button>

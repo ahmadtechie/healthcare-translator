@@ -95,7 +95,10 @@ class SpeechToTextView(generics.GenericAPIView):
             raise serializers.ValidationError("Error transcribing text.")
 
         if converted_path:
-            os.remove(converted_path)  # cleanup
+            try:
+                os.remove(converted_path)  # cleanup
+            except Exception:
+                ...
 
         extracted_transcript = self.extract_transcripts(response)
         return Response({"Transcript": extracted_transcript})

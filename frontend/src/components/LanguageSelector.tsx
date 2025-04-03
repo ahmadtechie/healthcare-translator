@@ -21,6 +21,7 @@ const languages: Language[] = [
   { value: 'ko', label: 'Korean' },
   { value: 'ar', label: 'Arabic' },
   { value: 'hi', label: 'Hindi' },
+  { value: 'yo', label: 'Yoruba' },
 ];
 
 export const LanguageSelector: React.FC<LanguageSelectorProps> = ({

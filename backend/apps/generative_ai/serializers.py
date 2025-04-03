@@ -1,4 +1,4 @@
-from langcodes import standardize_tag, tag_is_valid
+from langcodes import tag_is_valid
 from rest_framework import serializers
 
 
