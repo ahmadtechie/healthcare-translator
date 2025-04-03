@@ -30,4 +30,4 @@ ENV GOOGLE_APPLICATION_CREDENTIALS=/app/service_account.json
 EXPOSE 8000
 
 # Command to run the app
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "backend.wsgi:application"]
+CMD ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
