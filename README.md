@@ -20,13 +20,12 @@ AI-Powered Voice-to-Text Translator is a web application designed to convert spo
 
 ## 🛠 Technology Stack
 ### 🧠 AI & APIs
-- **🤖 Generative AI Tools:** OpenAI API or similar for enhanced transcription and translation.
-- **🎤 Speech Recognition API:** Web Speech API or Google Speech-to-Text for real-time voice-to-text conversion.
+- **🤖 Generative AI Tools:** Google Cloud API for enhanced transcription and translation.
+- **🎤 Speech Recognition API:** Google Speech-to-Text for real-time voice-to-text conversion.
 
 ### 💻 Development & Deployment
 - **🖥 Frontend:** React.js with Tailwind CSS for a responsive UI.
 - **🔙 Backend:** Django for API handling.
-- **🚀 Deployment:** Hosted on Vercel, V0, or Cursor with a live link provided.
 
 ---
 
@@ -46,28 +45,34 @@ AI-Powered Voice-to-Text Translator is a web application designed to convert spo
 ### 📌 Prerequisites
 - Node.js (for frontend development)
 - Python (for backend, if applicable)
-- API keys for OpenAI and Google Speech-to-Text
+- API keys for Google Cloud Translation and Google Speech-to-Text
 
 ### 🛠 Steps to Run Locally
 1. **Clone the repository:**
    ```sh
-   git clone https://github.com/your-username/voice-translation-app.git
-   cd voice-translation-app
+   git clone https://github.com/ahmadtechie/healthcare-translator.git
+   cd healthcare-translator
    ```
 2. **Install dependencies:**
    ```sh
+   cd frontend
    npm install
+
+   cd backend
+   python manage.py runserver
    ```
 3. **Set up environment variables in a `.env` file:**
-   ```env
-   REACT_APP_OPENAI_API_KEY=your_api_key
-   REACT_APP_SPEECH_API_KEY=your_speech_api_key
-   ```
+   Refer to the example.env file in both the frontend and backend directories 
+
 4. **Start the development server:**
    ```sh
-   npm start
+   cd frontend
+   npm run dev
+
+   cd backend
+   python manage.py runserver
    ```
-5. **Access the app at** `http://localhost:3000`
+5. **Access the app at** `http://localhost:5173/`
 
 ---
 
@@ -93,5 +98,4 @@ This project is licensed under the **MIT License**
 ---
 
 ## 📩 Contact
-For inquiries, contact **[Your Name]** at **[Your Email]**.
-
+For inquiries, contact **Ahmad Sharafudeen** at **ahmadsharafudeen@gmail.com**.
