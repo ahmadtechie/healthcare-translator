@@ -37,7 +37,11 @@ SECRET_KEY = "django-insecure-f1rrjf2)&t6&r#reb&q$t71b6s*8+_x$=ri7tv=kjgc1awx8k0
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "backend-wispy-dream-1298.fly.dev",
+    "healthcare-translator-five.vercel.app",
+    "localhost",
+]
 
 
 # Application definition

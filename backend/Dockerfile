@@ -1,33 +1,29 @@
-# Use an official Python runtime as a parent image
-FROM python:3.12-slim
+ARG PYTHON_VERSION=3.11-slim
 
-# Set environment variables
+FROM python:${PYTHON_VERSION}
+
+ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# Set working directory
-WORKDIR /app
+RUN mkdir -p /code
 
-# Install system dependencies for ffmpeg and other libraries
+WORKDIR /code
+
+COPY requirements.txt /tmp/requirements.txt
+RUN set -ex && \
+    pip install --upgrade pip && \
+    pip install -r /tmp/requirements.txt && \
+    rm -rf /root/.cache/
+
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the Python dependencies
-COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+COPY . /code
 
-# Copy the rest of the application
-COPY . /app/
+ENV GOOGLE_APPLICATION_CREDENTIALS=/code/service_account.json
 
-# Ensure the Google Cloud credntials are in place
-COPY service_account.json /app/service_account.json
-
-# Set the environment variables for Google Cloud Credentials
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/service_account.json
-
-# Expose the port your app will run on
 EXPOSE 8000
 
-# Command to run the app
-CMD ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
+CMD ["gunicorn","--bind",":8000","--workers","2","backend.wsgi"]
